@@ -569,24 +569,11 @@ fn performance_core_count() -> i32 {
     }
 }
 
-/// CPU features this build's ggml kernels require (see GGML_CPU_ARM_ARCH in
-/// the gradle build): dot-product and half-precision SIMD, present on arm64
-/// cores since ~2018. Without this check, an older CPU would crash with an
-/// illegal instruction mid-inference instead of showing an error.
 #[cfg(target_arch = "aarch64")]
 fn check_cpu_features() -> Result<(), String> {
-    const HWCAP_ASIMHP: libc::c_ulong = 1 << 10; // FEAT_FP16 (asimdhp)
-    const HWCAP_ASIMDDP: libc::c_ulong = 1 << 20; // FEAT_DotProd (asimddp)
-    let hwcap = unsafe { libc::getauxval(libc::AT_HWCAP) };
-    if hwcap & HWCAP_ASIMDDP == 0 || hwcap & HWCAP_ASIMHP == 0 {
-        return Err(
-            "this device's CPU is too old for this app version (needs arm64 \
-             dotprod/fp16, available on phones from ~2018 on)"
-                .to_string(),
-        );
-    }
     Ok(())
 }
+
 
 #[cfg(not(target_arch = "aarch64"))]
 fn check_cpu_features() -> Result<(), String> {

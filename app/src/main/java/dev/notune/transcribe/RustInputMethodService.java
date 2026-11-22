@@ -39,6 +39,7 @@ public class RustInputMethodService extends InputMethodService {
     }
 
     private TextView statusView;
+    private TextView switchModelButton;
     private TextView hintView;
     private View recordContainer;
     private android.widget.ImageView micIcon;
@@ -126,6 +127,10 @@ public class RustInputMethodService extends InputMethodService {
             });
 
             statusView = view.findViewById(R.id.ime_status_text);
+            switchModelButton = view.findViewById(R.id.ime_switch_model);
+            updateImeModelLabel();
+            switchModelButton.setOnClickListener(v -> cycleImeModel());
+
             progressBar = view.findViewById(R.id.ime_progress);
             recordContainer = view.findViewById(R.id.ime_record_container);
             micIcon = view.findViewById(R.id.ime_mic_icon);
@@ -631,8 +636,48 @@ public class RustInputMethodService extends InputMethodService {
         return new File(getFilesDir(), "pause_audio").exists();
     }
 
-    /** "Record in background" is default ON; the marker file is the opt-out. */
+        /** "Record in background" is default ON; the marker file is the opt-out. */
     private boolean isStopOnHideEnabled() {
         return new File(getFilesDir(), "stop_on_hide").exists();
     }
+
+    private void updateImeModelLabel() {
+        if (switchModelButton == null) return;
+        String active = ModelStore.ensureValidSelection(this);
+        if (active.isEmpty()) {
+            switchModelButton.setText("⇄ " + ModelStore.RECOMMENDED_NAME);
+        } else {
+            String shortName = active.replace(".gguf", "");
+            if (shortName.length() > 22) shortName = shortName.substring(0, 22) + "…";
+            switchModelButton.setText("⇄ " + shortName);
+        }
+    }
+
+    private void cycleImeModel() {
+        java.util.List<String> models = new java.util.ArrayList<>();
+        if (ModelStore.hasBuiltinModel(this)) models.add("");
+        models.addAll(ModelStore.importedModels(this));
+        if (models.size() <= 1) return;
+
+        String current = ModelStore.activeModel(this);
+        int idx = models.indexOf(current);
+        String next = models.get((idx + 1) % models.size());
+        ModelStore.setActiveModel(this, next);
+
+        if (isRecording) {
+            try { cancelRecording(); } catch (Throwable ignored) {}
+            releaseAudioFocus();
+            updateRecordButtonUI(false);
+        }
+
+        updateImeModelLabel();
+        if (statusView != null) statusView.setText(R.string.ime_tap_to_record);
+        try {
+            cleanupNative(this);
+            initNative(this);
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to reload model in IME", t);
+        }
+    }
 }
+

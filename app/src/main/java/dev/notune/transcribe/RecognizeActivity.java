@@ -41,6 +41,7 @@ public class RecognizeActivity extends AppCompatActivity {
     }
 
     private TextView status;
+    private TextView switchModelBtn;
     private boolean isRecording = false;
     private MicLevelView micLevel;
     private final AudioFocusPauser audioPauser = new AudioFocusPauser();
@@ -57,6 +58,10 @@ public class RecognizeActivity extends AppCompatActivity {
 
         micLevel = findViewById(R.id.mic_level);
         status = findViewById(R.id.txt_status);
+        switchModelBtn = findViewById(R.id.btn_switch_model);
+updateModelButtonLabel();
+switchModelBtn.setOnClickListener(v -> cycleModelAndRestart());
+
 
         findViewById(R.id.btn_close).setOnClickListener(v -> {
             // discard current recording
@@ -281,4 +286,40 @@ public class RecognizeActivity extends AppCompatActivity {
     private native void startRecording(boolean autoStop);
     private native void stopRecording();
     private native void cancelRecording();
+    private void updateModelButtonLabel() {
+    if (switchModelBtn == null) return;
+    String active = ModelStore.ensureValidSelection(this);
+    if (active.isEmpty()) {
+        switchModelBtn.setText("⇄ " + ModelStore.RECOMMENDED_NAME);
+    } else {
+        String shortName = active.replace(".gguf", "");
+        if (shortName.length() > 24) shortName = shortName.substring(0, 24) + "…";
+        switchModelBtn.setText("⇄ " + shortName);
+    }
+}
+
+private void cycleModelAndRestart() {
+    java.util.List<String> models = new ArrayList<>();
+    if (ModelStore.hasBuiltinModel(this)) models.add("");
+    models.addAll(ModelStore.importedModels(this));
+    if (models.size() <= 1) return;
+
+    String current = ModelStore.activeModel(this);
+    int idx = models.indexOf(current);
+    String next = models.get((idx + 1) % models.size());
+    ModelStore.setActiveModel(this, next);
+
+    if (isRecording) {
+        isRecording = false;
+        try { cancelRecording(); } catch (Throwable ignored) {}
+    }
+    try { cleanupNative(this); } catch (Throwable ignored) {}
+
+    updateModelButtonLabel();
+    initNative(this);
+    isRecording = true;
+    status.setText(R.string.voice_listening);
+    startRecording(isAutoStopEnabled());
+}
+
 }

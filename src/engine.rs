@@ -82,8 +82,7 @@ impl Engine {
         if !model_path.is_file() {
             return Err(format!("model file not found: {}", model_path.display()));
         }
-        std::env::set_var("TRANSCRIBE_NO_MMAP", "1");
-        let model = transcribe_cpp::Model::load(model_path).map_err(|e| e.to_string())?;
+                let model = transcribe_cpp::Model::load(model_path).map_err(|e| e.to_string())?;
 
         // Translation is gated on the model's capabilities: models without it
         // (e.g. Parakeet) silently keep transcribing, so the setting can stay
